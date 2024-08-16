@@ -25,7 +25,7 @@
 //!  PointsC(8)
 //!  PointsH(9)
 //!  Contributions(10)
-use ark_ff::{BigInteger256, PrimeField};
+use ark_ff::PrimeField;
 use ark_relations::r1cs::ConstraintMatrices;
 use ark_serialize::{CanonicalDeserialize, SerializationError};
 use ark_std::log2;
@@ -36,7 +36,16 @@ use std::{
     io::{Read, Seek, SeekFrom},
 };
 
-use ark_bn254::{Bn254, Fq, Fq2, Fr, G1Affine, G2Affine};
+#[cfg(not(feature = "bls12-381"))]
+use ark_bn254::{Bn254 as E, Fq, Fq2, Fr, G1Affine, G2Affine};
+#[cfg(not(feature = "bls12-381"))]
+use ark_ff::{BigInteger256 as FqBigInt, BigInteger256 as FrBigInt};
+
+#[cfg(feature = "bls12-381")]
+use ark_bls12_381::{Bls12_381 as E, Fq, Fq2, Fr, G1Affine, G2Affine};
+#[cfg(feature = "bls12-381")]
+use ark_ff::{BigInteger384 as FqBigInt, BigInteger256 as FrBigInt};
+
 use ark_groth16::{ProvingKey, VerifyingKey};
 use num_traits::Zero;
 
@@ -52,7 +61,7 @@ struct Section {
 /// Reads a SnarkJS ZKey file into an Arkworks ProvingKey.
 pub fn read_zkey<R: Read + Seek>(
     reader: &mut R,
-) -> IoResult<(ProvingKey<Bn254>, ConstraintMatrices<Fr>)> {
+) -> IoResult<(ProvingKey<E>, ConstraintMatrices<Fr>)> {
     let mut binfile = BinFile::new(reader)?;
     let proving_key = binfile.proving_key()?;
     let matrices = binfile.matrices()?;
@@ -100,7 +109,7 @@ impl<'a, R: Read + Seek> BinFile<'a, R> {
         })
     }
 
-    fn proving_key(&mut self) -> IoResult<ProvingKey<Bn254>> {
+    fn proving_key(&mut self) -> IoResult<ProvingKey<E>> {
         let header = self.groth_header()?;
         let ic = self.ic(header.n_public)?;
 
@@ -110,7 +119,7 @@ impl<'a, R: Read + Seek> BinFile<'a, R> {
         let l_query = self.l_query(header.n_vars - header.n_public - 1)?;
         let h_query = self.h_query(header.domain_size as usize)?;
 
-        let vk = VerifyingKey::<Bn254> {
+        let vk = VerifyingKey::<E> {
             alpha_g1: header.verifying_key.alpha_g1,
             beta_g2: header.verifying_key.beta_g2,
             gamma_g2: header.verifying_key.gamma_g2,
@@ -118,7 +127,7 @@ impl<'a, R: Read + Seek> BinFile<'a, R> {
             gamma_abc_g1: ic,
         };
 
-        let pk = ProvingKey::<Bn254> {
+        let pk = ProvingKey::<E> {
             vk,
             beta_g1: header.verifying_key.beta_g1,
             delta_g1: header.verifying_key.delta_g1,
@@ -263,11 +272,11 @@ struct HeaderGroth {
     #[allow(dead_code)]
     n8q: u32,
     #[allow(dead_code)]
-    q: BigInteger256,
+    q: FqBigInt,
     #[allow(dead_code)]
     n8r: u32,
     #[allow(dead_code)]
-    r: BigInteger256,
+    r: FrBigInt,
 
     n_vars: usize,
     n_public: usize,
@@ -288,12 +297,12 @@ impl HeaderGroth {
     fn read<R: Read>(mut reader: &mut R) -> IoResult<Self> {
         // TODO: Impl From<u32> in Arkworks
         let n8q: u32 = u32::deserialize_uncompressed(&mut reader)?;
-        // group order r of Bn254
-        let q = BigInteger256::deserialize_uncompressed(&mut reader)?;
+        // group order r of E
+        let q = FqBigInt::deserialize_uncompressed(&mut reader)?;
 
         let n8r: u32 = u32::deserialize_uncompressed(&mut reader)?;
         // Prime field modulus
-        let r = BigInteger256::deserialize_uncompressed(&mut reader)?;
+        let r = FrBigInt::deserialize_uncompressed(&mut reader)?;
 
         let n_vars = u32::deserialize_uncompressed(&mut reader)? as usize;
         let n_public = u32::deserialize_uncompressed(&mut reader)? as usize;
@@ -320,13 +329,13 @@ impl HeaderGroth {
 // need to divide by R, since snarkjs outputs the zkey with coefficients
 // multiplieid by R^2
 fn deserialize_field_fr<R: Read>(reader: &mut R) -> IoResult<Fr> {
-    let bigint = BigInteger256::deserialize_uncompressed(reader)?;
+    let bigint = FrBigInt::deserialize_uncompressed(reader)?;
     Ok(Fr::new_unchecked(Fr::new_unchecked(bigint).into_bigint()))
 }
 
 // skips the multiplication by R because Circom points are already in Montgomery form
 fn deserialize_field<R: Read>(reader: &mut R) -> IoResult<Fq> {
-    let bigint = BigInteger256::deserialize_uncompressed(reader)?;
+    let bigint = FqBigInt::deserialize_uncompressed(reader)?;
     // if you use Fq::new it multiplies by R
     Ok(Fq::new_unchecked(bigint))
 }
@@ -863,11 +872,11 @@ mod tests {
         let inputs = circom.get_public_inputs().unwrap();
 
         let mut rng = thread_rng();
-        let proof = Groth16::<Bn254, CircomReduction>::prove(&params, circom, &mut rng).unwrap();
+        let proof = Groth16::<E, CircomReduction>::prove(&params, circom, &mut rng).unwrap();
 
-        let pvk = Groth16::<Bn254>::process_vk(&params.vk).unwrap();
+        let pvk = Groth16::<E>::process_vk(&params.vk).unwrap();
 
-        let verified = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap();
+        let verified = Groth16::<E>::verify_with_processed_vk(&pvk, &inputs, &proof).unwrap();
 
         assert!(verified);
     }
@@ -898,7 +907,7 @@ mod tests {
         let full_assignment = wtns
             .calculate_witness_element::<Fr, _>(&mut store, inputs, false)
             .unwrap();
-        let proof = Groth16::<Bn254, CircomReduction>::create_proof_with_reduction_and_matrices(
+        let proof = Groth16::<E, CircomReduction>::create_proof_with_reduction_and_matrices(
             &params,
             r,
             s,
@@ -909,9 +918,9 @@ mod tests {
         )
         .unwrap();
 
-        let pvk = Groth16::<Bn254>::process_vk(&params.vk).unwrap();
+        let pvk = Groth16::<E>::process_vk(&params.vk).unwrap();
         let inputs = &full_assignment[1..num_inputs];
-        let verified = Groth16::<Bn254>::verify_with_processed_vk(&pvk, inputs, &proof).unwrap();
+        let verified = Groth16::<E>::verify_with_processed_vk(&pvk, inputs, &proof).unwrap();
 
         assert!(verified);
     }

@@ -181,10 +181,10 @@ impl Header {
             != hex::decode("010000f093f5e1439170b97948e833285d588181b64550b829a031e1724e6430")
                 .unwrap()
         {
-            return Err(IoError(Error::new(
-                ErrorKind::InvalidData,
-                "This parser only supports bn256",
-            )));
+            // return Err(IoError(Error::new(
+            //     ErrorKind::InvalidData,
+            //     "This parser only supports bn256",
+            // )));
         }
 
         Ok(Header {

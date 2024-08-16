@@ -12,3 +12,10 @@ pub mod ethereum;
 
 mod zkey;
 pub use zkey::read_zkey;
+
+mod zkey_bls12_381;
+pub use zkey_bls12_381::read_zkey as read_bls12_381_zkey;
+
+pub mod zkp;
+
+pub mod input;

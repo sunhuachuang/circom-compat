@@ -73,6 +73,11 @@ impl<F: PrimeField> CircomBuilder<F> {
         values.push(val.into());
     }
 
+    /// Update inputs
+    pub fn push_inputs(&mut self, inputs: HashMap<String, Vec<BigInt>>) {
+        self.inputs = inputs;
+    }
+
     /// Generates an empty circom circuit with no witness set, to be used for
     /// generation of the trusted setup parameters
     pub fn setup(&self) -> CircomCircuit<F> {
@@ -101,7 +106,7 @@ impl<F: PrimeField> CircomBuilder<F> {
         circom.witness = Some(witness);
 
         // sanity check
-        debug_assert!({
+        assert!({
             use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
             let cs = ConstraintSystem::<F>::new_ref();
             circom.clone().generate_constraints(cs.clone()).unwrap();

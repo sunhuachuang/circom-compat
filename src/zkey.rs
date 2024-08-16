@@ -36,15 +36,8 @@ use std::{
     io::{Read, Seek, SeekFrom},
 };
 
-#[cfg(not(feature = "bls12-381"))]
 use ark_bn254::{Bn254 as E, Fq, Fq2, Fr, G1Affine, G2Affine};
-#[cfg(not(feature = "bls12-381"))]
 use ark_ff::{BigInteger256 as FqBigInt, BigInteger256 as FrBigInt};
-
-#[cfg(feature = "bls12-381")]
-use ark_bls12_381::{Bls12_381 as E, Fq, Fq2, Fr, G1Affine, G2Affine};
-#[cfg(feature = "bls12-381")]
-use ark_ff::{BigInteger384 as FqBigInt, BigInteger256 as FrBigInt};
 
 use ark_groth16::{ProvingKey, VerifyingKey};
 use num_traits::Zero;

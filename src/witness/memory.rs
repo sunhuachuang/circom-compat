@@ -4,7 +4,7 @@ use num_traits::ToPrimitive;
 use wasmer::{Memory, MemoryAccessError, MemoryView, Store};
 
 // TODO: Decide whether we want Ark here or if it should use a generic BigInt package
-use ark_bn254::FrConfig;
+use ark_bls12_381::FrConfig;
 use ark_ff::MontConfig;
 use ark_ff::{BigInteger, BigInteger256, Zero};
 
@@ -43,7 +43,7 @@ impl SafeMemory {
             BigInt::from_biguint(num_bigint::Sign::NoSign, BigUint::from(FrConfig::MODULUS))
                 - &short_max;
         let r_inv = BigInt::from_str(
-            "9915499612839321149637521777990102151350674507940716049588462388200839649614",
+            "12549076656233958353659347336803947287922716146853412054870763148006372261952",
         )
         .unwrap();
 
